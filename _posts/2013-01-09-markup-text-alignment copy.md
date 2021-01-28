@@ -1,0 +1,1083 @@
+---
+title : 2장_머신러닝의 기반 프레임 워크!
+toc: true   #Table Of Contents 목차 
+toc_icon: "cog"
+toc_sticky: true
+categories:
+  - ML
+tags : 
+  - python
+use_math : true
+--- 
+ 
+ **본 포스팅은 [파이썬 머신러닝 완벽 가이드 _ 권철민 저] 도서를 기반으로 하고 있으며, 본인이 직접 요약, 정리한 내용입니다.**
+
+# 03 : 사이킷 런의 기반 프레임 워크 익히기
+
+ - ### Estimator 이해 및 fit(), predict() 메서드
+
+ 사이킷 런에서는 분류를 'Classifier', 회귀를 'Regressor' 클래스로 지칭한다.
+ 그리고 상기 두 클래스를 'Estimator'라고 통칭한다. 
+ 
+ Estimator 클래스는 fit()과 predict()를 내부에서 구현하고 있다.
+ 
+ cross_val_score()와 같은 evaluataion 함수, GridSearchCV와 같은 하이퍼 파라미터 튜닝을 지원하는 클래스의 경우, 이 Estimator를 인자로 받는다.
+ 
+ 비지도학습, feature 추출 등을 구현한 클래스 역시 대부분 fit()과 transform()을 적용한다. 이때의 fit()은 지도 학습의 fit()과 같이 '학습'을 의미하는 것이 아니라 __입력 데이터의 형태에 맞춰 데이터를 변환하기 위한 사전 구조를 맞추는 작업이다.__ fit()으로 변환을 위한 사전 구조를 맞추면, 이후 입력 데이터의 차원 변환, 클러스터링, feature 추출 등읠 실제 작업은 transform()으로 수행하는 것이다. 사이킷 런은 fit()과 transform()을 하나로 결합한 fit_transform()도 함께 제공한다.-> 이는 비지도 학습 단원에서 자세히 설명하도록 하겠다.
+
+ - ### 사이킷 런의 주요 모듈
+
+ - __예제 데이터__ : _sklearn.datasets_
+ 
+ - __feature 처리__ 
+ 
+ > _sklearn.preprocessing_ : 데이터 전처리에 필요한 다양한 가공 기능 제공
+  > _sklearn.feature_selection_ : 알고리즘에 큰 영향을 미치는 feature을 우선 순위대로 selection 작업을 수행하는 다양한 기능 제공
+  > _sklearn.feature_extraction_ : 텍스트 or 이미지 데이터의 vectorized feature을 추출하는 데 사용된다.
+ 
+ - __feature처리 & 차원 축소 :__  _sklearn.decomposition_ : 차원 축소와 관련한 알고리즘을 지원하는 모듈이다.
+
+ - __데이터 분리. 검증 & 파라미터 튜닝 :__ _sklearn.model_selection_ : 교차 검증을 위한 학습용/테스트 분리. Grid Search로 최적 파라미터 추출 등의 API를 제공한다.
+ 
+ - __평가 :__ _sklearn.metrics_ : 분류, 회귀, 클러스터링, Pairwise)에 대한 다양한 성능 측정 방법 제공
+ 
+ - __ML 알고리즘 :__ 
+ > _sklearn.ensemble :_ 앙상블 알고리즘 제공(RF, AdaBoost, GBM 등)
+ > _sklearn.linear_model :_ 선형, 릿지, 라쏘, 로지스틱 회귀 및 SGD 관련 알고리즘 제공
+ > _sklearn.naive_bayes :_ 나이브 베이즈 알고리즘 제공
+ > _sklearn.neighbors :_ KNN 관련 알고리즘 제공
+ > _sklearn.svm :_ 서포트 벡터 머신 알고리즘 제공
+ > _sklearn.tree :_ 의사결정 트리 알고리즘 제공
+ > _sklearn.cluster :_ 비지도 클러스터링 알고리즘(K-mean, hierarchical, DBSCAN 등) 제공
+ 
+- __유틸리티 :__ : _sklearn.pipeline_ : feature 처리 등의 변환과 ML 알고리즘 학습, 예측 등을 __함께 묶어서 실행__ 할 수 있는 유틸리티 제공
+
+
+```python
+import sklearn.datasets
+```
+
+ - ### 내장된 예제 데이터 세트
+
+ > sklearn.datasets API에서 '분류'를 위한 무작위의 datasets을 만들어주는  __make_classification()__ 함수와 '회귀'를 위한 무작위의 datasets을 만들어주는 __make_blobs()__ 함수가 있다.
+
+
+```python
+x = sklearn.datasets.make_classification()
+y = sklearn.datasets.make_blobs()
+```
+
+키는 보통 data, target, target_name, feature_names, DESCR로 구성돼 있다.
+개별 키가 가리키는 의미는 다음과 같다.
+* data는 피처의 데이터 세트를 가리킨다.
+* target은 분류 시 레이블 값, 회귀일 때는 숫자 결괏값 데이터 세트이다.
+* target_names는 개별 레이블의 이름을 나타낸다.
+* feature_names는 피처의 이름을 나타낸다.
+* DESCR은 데이터 세트에 대한 설명과 각 피처의 설명을 나타낸다.
+
+
+```python
+keys = sklearn.datasets.load_iris().keys() #키 값 반환
+print('붓꽃 데이터 세트의 키들:', keys)
+print(sklearn.datasets.load_iris()['DESCR'])
+```
+
+    붓꽃 데이터 세트의 키들: dict_keys(['data', 'target', 'target_names', 'DESCR', 'feature_names', 'filename'])
+    .. _iris_dataset:
+    
+    Iris plants dataset
+    --------------------
+    
+    **Data Set Characteristics:**
+    
+        :Number of Instances: 150 (50 in each of three classes)
+        :Number of Attributes: 4 numeric, predictive attributes and the class
+        :Attribute Information:
+            - sepal length in cm
+            - sepal width in cm
+            - petal length in cm
+            - petal width in cm
+            - class:
+                    - Iris-Setosa
+                    - Iris-Versicolour
+                    - Iris-Virginica
+                    
+        :Summary Statistics:
+    
+        ============== ==== ==== ======= ===== ====================
+                        Min  Max   Mean    SD   Class Correlation
+        ============== ==== ==== ======= ===== ====================
+        sepal length:   4.3  7.9   5.84   0.83    0.7826
+        sepal width:    2.0  4.4   3.05   0.43   -0.4194
+        petal length:   1.0  6.9   3.76   1.76    0.9490  (high!)
+        petal width:    0.1  2.5   1.20   0.76    0.9565  (high!)
+        ============== ==== ==== ======= ===== ====================
+    
+        :Missing Attribute Values: None
+        :Class Distribution: 33.3% for each of 3 classes.
+        :Creator: R.A. Fisher
+        :Donor: Michael Marshall (MARSHALL%PLU@io.arc.nasa.gov)
+        :Date: July, 1988
+    
+    The famous Iris database, first used by Sir R.A. Fisher. The dataset is taken
+    from Fisher's paper. Note that it's the same as in R, but not as in the UCI
+    Machine Learning Repository, which has two wrong data points.
+    
+    This is perhaps the best known database to be found in the
+    pattern recognition literature.  Fisher's paper is a classic in the field and
+    is referenced frequently to this day.  (See Duda & Hart, for example.)  The
+    data set contains 3 classes of 50 instances each, where each class refers to a
+    type of iris plant.  One class is linearly separable from the other 2; the
+    latter are NOT linearly separable from each other.
+    
+    .. topic:: References
+    
+       - Fisher, R.A. "The use of multiple measurements in taxonomic problems"
+         Annual Eugenics, 7, Part II, 179-188 (1936); also in "Contributions to
+         Mathematical Statistics" (John Wiley, NY, 1950).
+       - Duda, R.O., & Hart, P.E. (1973) Pattern Classification and Scene Analysis.
+         (Q327.D83) John Wiley & Sons.  ISBN 0-471-22361-1.  See page 218.
+       - Dasarathy, B.V. (1980) "Nosing Around the Neighborhood: A New System
+         Structure and Classification Rule for Recognition in Partially Exposed
+         Environments".  IEEE Transactions on Pattern Analysis and Machine
+         Intelligence, Vol. PAMI-2, No. 1, 67-71.
+       - Gates, G.W. (1972) "The Reduced Nearest Neighbor Rule".  IEEE Transactions
+         on Information Theory, May 1972, 431-433.
+       - See also: 1988 MLC Proceedings, 54-64.  Cheeseman et al"s AUTOCLASS II
+         conceptual clustering system finds 3 classes in the data.
+       - Many, many more ...
+    
+
+## 04 : Model Selection 소개
+### 학습/테스트 데이터 셋 분리 – train_test_split()
+
+* train_test_split 함수의 파라미터
+ > suffle : 데이터를 분리하기 전 데이터를 미리 섞을지를 결정
+
+ > random_state : 난수 발생을 위한 시드 번호 
+
+ > test size : test할 데이터의 비율; 디폴트는 0.25
+
+
+```python
+from sklearn.datasets import load_iris
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+
+iris = load_iris()
+dt_clf = DecisionTreeClassifier()
+X_train,X_test, y_train, y_test = train_test_split(iris.data, iris.target, test_size = 0.3, shuffle = True, random_state = 121)
+dt_clf.fit(X_train, y_train)
+
+# 학습 데이터 셋으로 예측 수행
+pred = dt_clf.predict(X_test)  # 예측 데이터를 학습데이터로 하면 안됨!!
+print('예측 정확도: {0: .4f}'.format(accuracy_score(y_test, pred)))
+```
+
+    예측 정확도:  0.9556
+    
+
+넘파이 ndarray 뿐만 아니라 판다스 DataFrame/Series도 train_test_split( )으로 분할 가능하다
+
+
+```python
+import pandas as pd
+
+iris_df = pd.DataFrame(iris.data, columns=iris.feature_names)
+iris_df['target']=iris.target
+ftr_df = iris_df.iloc[:, :-1] 
+tgt_df = iris_df.iloc[:, -1] # Series 형태임
+X_train, X_test, y_train, y_test = train_test_split(ftr_df, tgt_df, 
+                                                    test_size=0.3, random_state=121)
+print(type(X_train), type(X_test), type(y_train), type(y_test))
+X_train
+```
+
+    <class 'pandas.core.frame.DataFrame'> <class 'pandas.core.frame.DataFrame'> <class 'pandas.core.series.Series'> <class 'pandas.core.series.Series'>
+    
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>sepal length (cm)</th>
+      <th>sepal width (cm)</th>
+      <th>petal length (cm)</th>
+      <th>petal width (cm)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>133</td>
+      <td>6.3</td>
+      <td>2.8</td>
+      <td>5.1</td>
+      <td>1.5</td>
+    </tr>
+    <tr>
+      <td>143</td>
+      <td>6.8</td>
+      <td>3.2</td>
+      <td>5.9</td>
+      <td>2.3</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>4.8</td>
+      <td>3.4</td>
+      <td>1.9</td>
+      <td>0.2</td>
+    </tr>
+    <tr>
+      <td>72</td>
+      <td>6.3</td>
+      <td>2.5</td>
+      <td>4.9</td>
+      <td>1.5</td>
+    </tr>
+    <tr>
+      <td>40</td>
+      <td>5.0</td>
+      <td>3.5</td>
+      <td>1.3</td>
+      <td>0.3</td>
+    </tr>
+    <tr>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <td>83</td>
+      <td>6.0</td>
+      <td>2.7</td>
+      <td>5.1</td>
+      <td>1.6</td>
+    </tr>
+    <tr>
+      <td>65</td>
+      <td>6.7</td>
+      <td>3.1</td>
+      <td>4.4</td>
+      <td>1.4</td>
+    </tr>
+    <tr>
+      <td>95</td>
+      <td>5.7</td>
+      <td>3.0</td>
+      <td>4.2</td>
+      <td>1.2</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>4.4</td>
+      <td>2.9</td>
+      <td>1.4</td>
+      <td>0.2</td>
+    </tr>
+    <tr>
+      <td>66</td>
+      <td>5.6</td>
+      <td>3.0</td>
+      <td>4.5</td>
+      <td>1.5</td>
+    </tr>
+  </tbody>
+</table>
+<p>105 rows × 4 columns</p>
+</div>
+
+
+
+### 교차 검증
+* K 폴드 
+
+테스트 데이터는 모든 학습/검정 과정이 완료된 후 최종적으로 성능을 평가하기 위한 데이터 세트이다.
+
+테스트 데이터와 분리된 학습데이터를 k 분할하여 '학습' 데이터와 학습된 모델의 성능을 일차 평가하는 '검증' 데이터로 나눈다.
+ 
+test 데이터 set이 많지 않다보니, 학습 데이터 일부를 valid data로 활용하는 것이다.
+즉, '수차례'의 모의고사를 거쳐 수능을 본다고 생각하면 된다.
+ 
+ 학습 데이터와 테스트 데이터가 종속성이 강하면, 알고리즘이 좋은 건지, 비슷한 데이터를 학습 검정해서 좋은건지 판단할 수 없으므로, 여러번 테스트를 해서 알고리즘을 평가해야 한다.
+
+
+```python
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import KFold
+import numpy as np
+
+iris = load_iris()
+features = iris.data
+label = iris.target
+dt_clf = DecisionTreeClassifier(random_state=156)
+
+# 5개의 폴드 세트로 분리하는 KFold 객체와 폴드 세트별 정확도를 담을 리스트 객체 생성.
+kfold = KFold(n_splits=5)
+cv_accuracy = []
+
+#기존 데이터 세트 크기
+print('붓꽃 데이터 세트 크기:',features.shape[0])
+
+n_iter = 0
+# KFold객체의 split( )메서드를 호출하면 폴드 별 학습용, 검증용 테스트의 로우 
+#인덱스를 array로 반환  
+for train_index, test_index  in kfold.split(features): 
+    # kfold.split( )으로 반환된 인덱스를 이용하여 학습용, 검증용 테스트 데이터 추출
+    # 변수 명에 'test'가 있다고 해서, test dataset이 아니라 valid datasets임을 유의하자.
+    X_train, X_test = features[train_index], features[test_index]
+    y_train, y_test = label[train_index], label[test_index]
+    
+    #학습 및 예측 
+    dt_clf.fit(X_train , y_train)    
+    pred = dt_clf.predict(X_test)
+    n_iter += 1
+    
+    # 반복 시 마다 정확도 측정 
+    accuracy = np.round(accuracy_score(y_test,pred), 4)
+    train_size = X_train.shape[0]
+    test_size = X_test.shape[0]
+    print('\n#{0} 교차 검증 정확도 :{1}, 학습 데이터 크기: {2}, 검증 데이터 크기: {3}'
+          .format(n_iter, accuracy, train_size, test_size))
+    print('#{0} 검증 세트 인덱스:{1}'.format(n_iter,test_index))
+    
+    cv_accuracy.append(accuracy)
+    
+# 개별 iteration별 정확도를 합하여 평균 정확도 계산 
+print('\n## 평균 검증 정확도:', np.mean(cv_accuracy)) 
+```
+
+    붓꽃 데이터 세트 크기: 150
+    
+    #1 교차 검증 정확도 :1.0, 학습 데이터 크기: 120, 검증 데이터 크기: 30
+    #1 검증 세트 인덱스:[ 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+     24 25 26 27 28 29]
+    
+    #2 교차 검증 정확도 :0.9667, 학습 데이터 크기: 120, 검증 데이터 크기: 30
+    #2 검증 세트 인덱스:[30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53
+     54 55 56 57 58 59]
+    
+    #3 교차 검증 정확도 :0.8667, 학습 데이터 크기: 120, 검증 데이터 크기: 30
+    #3 검증 세트 인덱스:[60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83
+     84 85 86 87 88 89]
+    
+    #4 교차 검증 정확도 :0.9333, 학습 데이터 크기: 120, 검증 데이터 크기: 30
+    #4 검증 세트 인덱스:[ 90  91  92  93  94  95  96  97  98  99 100 101 102 103 104 105 106 107
+     108 109 110 111 112 113 114 115 116 117 118 119]
+    
+    #5 교차 검증 정확도 :0.7333, 학습 데이터 크기: 120, 검증 데이터 크기: 30
+    #5 검증 세트 인덱스:[120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137
+     138 139 140 141 142 143 144 145 146 147 148 149]
+    
+    ## 평균 검증 정확도: 0.9
+    
+
+* Stratified K 폴드
+
+상기 기본 K 폴드 함수를 활용한 결과를 보았을 때, 검증 데이터의 인덱스는 range 형태로 정렬되어 있음을 확인할 수 있다. 
+
+위와 같은 방식은 아래와 같은 문제를 야기할 수 있다.
+
+
+```python
+import pandas as pd
+
+iris = load_iris()
+
+iris_df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+iris_df['label']=iris.target
+iris_df['label'].value_counts()
+
+kfold = KFold(n_splits=3)
+# kfold.split(X)는 폴드 세트를 3번 반복할 때마다 달라지는 학습/테스트 용 데이터 로우 인덱스 번호 반환. 
+n_iter =0
+for train_index, test_index  in kfold.split(iris_df):
+    n_iter += 1
+    label_train= iris_df['label'].iloc[train_index]
+    label_test= iris_df['label'].iloc[test_index]
+    print('## 교차 검증: {0}'.format(n_iter))
+    print('학습 레이블 데이터 분포:\n', label_train.value_counts()) 
+    print('검증 레이블 데이터 분포:\n', label_test.value_counts())
+    
+```
+
+    ## 교차 검증: 1
+    학습 레이블 데이터 분포:
+     2    50
+    1    50
+    Name: label, dtype: int64
+    검증 레이블 데이터 분포:
+     0    50
+    Name: label, dtype: int64
+    ## 교차 검증: 2
+    학습 레이블 데이터 분포:
+     2    50
+    0    50
+    Name: label, dtype: int64
+    검증 레이블 데이터 분포:
+     1    50
+    Name: label, dtype: int64
+    ## 교차 검증: 3
+    학습 레이블 데이터 분포:
+     1    50
+    0    50
+    Name: label, dtype: int64
+    검증 레이블 데이터 분포:
+     2    50
+    Name: label, dtype: int64
+    
+
+ 이렇게 되면 데이터가 한쪽으로 쏠리므로 패턴이 나오지 않게 된다!
+  
+ 따라서 위와 같은 case를 보완하기 위해 StratifiedKFold를 사용한다.
+
+
+```python
+from sklearn.model_selection import StratifiedKFold
+
+skf = StratifiedKFold(n_splits=3)
+n_iter=0
+
+# for문 부분에서 기본 KFold와 차이가 있다.
+for train_index, test_index in skf.split(iris_df, iris_df['label']):
+    n_iter += 1
+    label_train= iris_df['label'].iloc[train_index]
+    label_test= iris_df['label'].iloc[test_index]
+    print('## 교차 검증: {0}'.format(n_iter))
+    print('학습 레이블 데이터 분포:\n', label_train.value_counts())
+    print('검증 레이블 데이터 분포:\n', label_test.value_counts())
+```
+
+    ## 교차 검증: 1
+    학습 레이블 데이터 분포:
+     2    33
+    1    33
+    0    33
+    Name: label, dtype: int64
+    검증 레이블 데이터 분포:
+     2    17
+    1    17
+    0    17
+    Name: label, dtype: int64
+    ## 교차 검증: 2
+    학습 레이블 데이터 분포:
+     2    33
+    1    33
+    0    33
+    Name: label, dtype: int64
+    검증 레이블 데이터 분포:
+     2    17
+    1    17
+    0    17
+    Name: label, dtype: int64
+    ## 교차 검증: 3
+    학습 레이블 데이터 분포:
+     2    34
+    1    34
+    0    34
+    Name: label, dtype: int64
+    검증 레이블 데이터 분포:
+     2    16
+    1    16
+    0    16
+    Name: label, dtype: int64
+    
+
+* cross_val_score( )
+
+
+```python
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import cross_val_score , cross_validate
+from sklearn.datasets import load_iris
+import numpy as np
+
+iris_data = load_iris()
+dt_clf = DecisionTreeClassifier(random_state=156)
+
+data = iris_data.data
+label = iris_data.target
+
+# 성능 지표는 정확도(accuracy) , 교차 검증 세트는 3개
+# 성능 지표는 추후 포스팅할 예정이다.
+scores = cross_val_score(dt_clf , data , label , scoring='accuracy',cv=3)
+# 위 api 하나로 상기 여러줄의 함수들을 대체한다.
+print('교차 검증별 정확도:',np.round(scores, 4))
+print('평균 검증 정확도:', np.round(np.mean(scores), 4))
+```
+
+    교차 검증별 정확도: [0.9804 0.9216 0.9792]
+    평균 검증 정확도: 0.9604
+    
+
+ ### GridSearchCV - 교차 검증과 최적 하이퍼 파라미터 튜닝을 한번에!
+
+
+```python
+from sklearn.datasets import load_iris
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.metrics import accuracy_score
+import pandas as pd
+
+iris = load_iris()
+X_train, X_test, y_train, y_test = train_test_split(iris_data.data, iris_data.target, 
+                                                    test_size=0.2, random_state=121)
+dtree = DecisionTreeClassifier()
+
+### parameter 들을 dictionary 형태로 설정
+parameters = {'max_depth':[1, 2, 3], 'min_samples_split':[2,3]}
+# param_grid의 하이퍼 파라미터들을 3개의 train, test set fold 로 나누어서 테스트 수행 설정.  
+#refit=True 가 default 이다. True이면 가장 좋은 파라미터 설정으로 재 학습 시킴.  
+grid_dtree = GridSearchCV(dtree, param_grid=parameters, cv=3, refit=True, return_train_score=True)
+# 위 dtree에는 classifier 혹은 regressor가 들어가야 한다.
+# refit : 최적의 하이퍼 parameter로 입력된 estimator의 변수를 학습(fit)시켜버림.
+#위 parameters 인수에는 반드시 리스트 or 딕셔너리 값이 들어가야 한다.
+# 붓꽃 Train 데이터로 param_grid의 하이퍼 파라미터들을 순차적으로 학습/평가 .
+grid_dtree.fit(X_train, y_train)
+
+# GridSearchCV 결과는 cv_results_ 라는 딕셔너리로 저장됨. 이를 DataFrame으로 변환
+scores_df = pd.DataFrame(grid_dtree.cv_results_)
+scores_df[['params', 'mean_test_score', 'rank_test_score', 
+           'split0_test_score', 'split1_test_score', 'split2_test_score']]
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>params</th>
+      <th>mean_test_score</th>
+      <th>rank_test_score</th>
+      <th>split0_test_score</th>
+      <th>split1_test_score</th>
+      <th>split2_test_score</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>{'max_depth': 1, 'min_samples_split': 2}</td>
+      <td>0.700000</td>
+      <td>5</td>
+      <td>0.700</td>
+      <td>0.7</td>
+      <td>0.70</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>{'max_depth': 1, 'min_samples_split': 3}</td>
+      <td>0.700000</td>
+      <td>5</td>
+      <td>0.700</td>
+      <td>0.7</td>
+      <td>0.70</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>{'max_depth': 2, 'min_samples_split': 2}</td>
+      <td>0.958333</td>
+      <td>3</td>
+      <td>0.925</td>
+      <td>1.0</td>
+      <td>0.95</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>{'max_depth': 2, 'min_samples_split': 3}</td>
+      <td>0.958333</td>
+      <td>3</td>
+      <td>0.925</td>
+      <td>1.0</td>
+      <td>0.95</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>{'max_depth': 3, 'min_samples_split': 2}</td>
+      <td>0.975000</td>
+      <td>1</td>
+      <td>0.975</td>
+      <td>1.0</td>
+      <td>0.95</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>{'max_depth': 3, 'min_samples_split': 3}</td>
+      <td>0.975000</td>
+      <td>1</td>
+      <td>0.975</td>
+      <td>1.0</td>
+      <td>0.95</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```python
+print('GridSearchCV 최적 파라미터:', grid_dtree.best_params_) # 뒤에 _를 잊지 말 것
+print('GridSearchCV 최고 정확도: {0:.4f}'.format(grid_dtree.best_score_))
+
+# refit=True로 설정된 GridSearchCV 객체가 fit()을 수행 시 학습이 완료된 Estimator를 내포하고 있으므로 predict()를 통해 예측도 가능. 
+pred = grid_dtree.predict(X_test)
+print('테스트 데이터 세트 정확도: {0:.4f}'.format(accuracy_score(y_test,pred)))
+```
+
+    GridSearchCV 최적 파라미터: {'max_depth': 3, 'min_samples_split': 2}
+    GridSearchCV 최고 정확도: 0.9750
+    테스트 데이터 세트 정확도: 0.9667
+    
+
+## 05 : 데이터 전처리
+### 데이터 인코딩
+
+- 레이블 인코딩(Label encoding)
+
+인코딩에는 레이블 인코딩 및 원-핫 인코딩이 있는데, 레이블 인코딩은 일대일 대응으로 특정 문자열 대신 특정 숫자로 대체한다.
+
+
+```python
+from sklearn.preprocessing import LabelEncoder # 패키지 알아둘 것
+
+items=['TV','냉장고','전자렌지','컴퓨터','선풍기','선풍기','믹서','믹서']
+
+# LabelEncoder를 객체로 생성한 후 , fit( ) 과 transform( ) 으로 label 인코딩 수행. 
+encoder = LabelEncoder()
+encoder.fit(items) # fit은 transform을 하기 전에 '형태'를 맞춰주기 위함이다.
+labels = encoder.transform(items)
+labels
+```
+
+
+
+
+    array([0, 1, 4, 5, 3, 3, 2, 2], dtype=int64)
+
+
+
+
+```python
+# 인코딩된 숫자에 대응하는 Label 클래스 값을 보여주는 메소드 classes_
+print('인코딩 클래스 :', encoder.classes_)
+```
+
+    인코딩 클래스 : ['TV' '냉장고' '믹서' '선풍기' '전자렌지' '컴퓨터']
+    
+
+
+```python
+# inverse_transform 메소드는 인코딩된 값을 디코딩 한다.
+encoder.inverse_transform([4,5,1,2,3,4,2,3])
+```
+
+
+
+
+    array(['전자렌지', '컴퓨터', '냉장고', '믹서', '선풍기', '전자렌지', '믹서', '선풍기'],
+          dtype='<U4')
+
+
+
+* 원-핫 인코딩(One-Hot encoding)
+
+ 원-핫 인코딩은 피처 유형에 따라 vector의 크기가 정해지며, feature 값에 해당하는 column에만 1을 표시하고 나머지는 0으로 표시한다.
+ 
+ 그러나 사이킷 런에서는 원-핫 인코딩을 하기 전에 각 데이터를 숫자 값으로 변환해야 한다. 이는 LabelEncoder으로 변환한다.
+
+
+```python
+from sklearn.preprocessing import OneHotEncoder
+import numpy as np
+
+items = ['TV', '냉장고', '전자레인지', '컴퓨터', '선풍기', '선풍기',' 믹서','믹서']
+encoder = LabelEncoder()
+encoder.fit(items)
+labels = encoder.transform(items)
+ # 1차원을 2차원으로 변환한다!
+labels = labels.reshape(-1,1)
+
+oh_encoder = OneHotEncoder()
+oh_encoder.fit(labels)
+oh_labels = oh_encoder.transform(labels)
+
+
+# 행은 데이터의 개수, 열은 feature 특성으로 구성되어 있다.
+print(oh_labels.toarray())
+```
+
+    [[0. 1. 0. 0. 0. 0. 0.]
+     [0. 0. 1. 0. 0. 0. 0.]
+     [0. 0. 0. 0. 0. 1. 0.]
+     [0. 0. 0. 0. 0. 0. 1.]
+     [0. 0. 0. 0. 1. 0. 0.]
+     [0. 0. 0. 0. 1. 0. 0.]
+     [1. 0. 0. 0. 0. 0. 0.]
+     [0. 0. 0. 1. 0. 0. 0.]]
+    
+
+    C:\Users\Oh Won Jin\Anaconda3\lib\site-packages\sklearn\preprocessing\_encoders.py:415: FutureWarning: The handling of integer data will change in version 0.22. Currently, the categories are determined based on the range [0, max(values)], while in the future they will be determined based on the unique values.
+    If you want the future behaviour and silence this warning, you can specify "categories='auto'".
+    In case you used a LabelEncoder before this OneHotEncoder to convert the categories to integers, then you can now use the OneHotEncoder directly.
+      warnings.warn(msg, FutureWarning)
+    
+
+
+```python
+# 위 방법 말고 판다스를 통해 원핫 인코딩을 편하게 할 수 있다.
+import pandas as pd
+
+df = pd.DataFrame({'item':['TV','냉장고','전자렌지','컴퓨터','선풍기','선풍기','믹서','믹서'] })
+# pd.get_dummies() 는 가변수를 만드는 방법이다.
+pd.get_dummies(df)
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>item_TV</th>
+      <th>item_냉장고</th>
+      <th>item_믹서</th>
+      <th>item_선풍기</th>
+      <th>item_전자렌지</th>
+      <th>item_컴퓨터</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+### 피처 스케일링과 정규화
+
+서로 다른 변수의 값 범위를 일정한 수준으로 맞추는 작업을 feature scaling이라고 한다.
+
+일반적인 표준화(Standardization)은 각 feature가 가우시안 표준 정규 분포를 가진 값으로 변환하는 것을 의미한다.
+
+ 일반적으로 정규화는 서로 다른 feature의 크기를 0과 1 사이의 범위로 통일하기 위해 크기를 변환해주는 개념이다.
+ 
+ 그러나 사이킷 런의 전처리에서 제공하는 Noramalizer 모듈과 상기 일반적인 정규화는 약간의 차이가 있는데, Normalizer 모듈은 '선형대수에서의 정규화' 개념이 도입된 것이다.
+ 
+ 따라서, 일반적인 표준화와 정규화는 feature scaling으로 통칭하고, 선형 대수 개념의 정규화를 벡터 정규화로 지칭하며 구분한다.
+ 
+ 우선, 사이킷런에서 제공하는 대표적인 feature scaling 클래스인 StandardScaler와 MinMaxScaler을 알아보겠다.
+
+* #### StandardScaler - 표준화
+ > 사이킷런에서 구현한 RBF 커널을 이용하는 SVM, 선형 회귀, 로지스틱 회귀에서는 데이터의 정규성 가정을 하기 때문에 표준화를 적용하는 것은 예측 성능 향상에 중요한 요소가 될 수 있다.
+
+
+```python
+from sklearn.datasets import load_iris
+import pandas as pd
+# 붓꽃 데이터 셋을 로딩하고 DataFrame으로 변환한다.
+iris_data = iris.data
+iris_df = pd.DataFrame(data=iris_data, columns=iris.feature_names)
+print('feature 들의 평균 값')
+print(iris_df.mean())
+print('\nfeature 들의 분산 값')
+print(iris_df.var())
+```
+
+    feature 들의 평균 값
+    sepal length (cm)    5.843333
+    sepal width (cm)     3.057333
+    petal length (cm)    3.758000
+    petal width (cm)     1.199333
+    dtype: float64
+    
+    feature 들의 분산 값
+    sepal length (cm)    0.685694
+    sepal width (cm)     0.189979
+    petal length (cm)    3.116278
+    petal width (cm)     0.581006
+    dtype: float64
+    
+
+
+```python
+from sklearn.preprocessing import StandardScaler
+
+# StandardScaler객체 생성
+scaler = StandardScaler()
+# StandardScaler 로 데이터 셋 변환. fit( ) 과 transform( ) 호출.  
+scaler.fit(iris_df)
+iris_scaled = scaler.transform(iris_df)
+
+#transform( )시 scale 변환된 데이터 셋이 numpy ndarry로 반환되어 이를 DataFrame으로 변환
+iris_df_scaled = pd.DataFrame(data=iris_scaled, columns=iris.feature_names)
+print('feature 들의 평균 값')
+print(iris_df_scaled.mean())
+print('\nfeature 들의 분산 값')
+print(iris_df_scaled.var())
+```
+
+    feature 들의 평균 값
+    sepal length (cm)   -1.690315e-15
+    sepal width (cm)    -1.842970e-15
+    petal length (cm)   -1.698641e-15
+    petal width (cm)    -1.409243e-15
+    dtype: float64
+    
+    feature 들의 분산 값
+    sepal length (cm)    1.006711
+    sepal width (cm)     1.006711
+    petal length (cm)    1.006711
+    petal width (cm)     1.006711
+    dtype: float64
+    
+
+*  #### MinMaxScaler
+- 일반적인 정규화의 개념이나, 데이터에 음수 값이 있으면 -1 ~ 1의 범위로 변환한다.
+
+- 데이터의 분포가 가우시안 분포가 아닐 경우에 적용해볼 수 있다.
+
+
+```python
+from sklearn.preprocessing import MinMaxScaler
+
+#MinMaxScaler 객체 생성
+scaler = MinMaxScaler()
+
+#MinMaxScaler로 데이터 set 변환, fit()과 transform() 호출.
+scaler.fit(iris_df)
+iris_scaled = scaler.transform(iris_df)
+
+# transform()시 scale 변환된 dataset이 numpy ndarray로 반환되어, 이를 DataFrame으로
+# 변환해야 한다.
+
+iris_df_scaled = pd.DataFrame(iris_scaled,columns = iris.feature_names)
+print('feature들의 최소 값')
+print(iris_df_scaled.min())
+print('\nfeature들의 최대 값')
+print(iris_df_scaled.max())
+
+```
+
+    feature들의 최소 값
+    sepal length (cm)    0.0
+    sepal width (cm)     0.0
+    petal length (cm)    0.0
+    petal width (cm)     0.0
+    dtype: float64
+    
+    feature들의 최대 값
+    sepal length (cm)    1.0
+    sepal width (cm)     1.0
+    petal length (cm)    1.0
+    petal width (cm)     1.0
+    dtype: float64
+    
+
+! __주의사항__
+
+머신러닝 알고리즘에서의 fit, transform과 데이터 전처리에서의 fit, transform은 다른 개념이다.
+
+후자를 기준으로 설명할 때,  fit()은 일반적으로 데이터 변환을 위한 기준 정보 설정(예를 들어 data sets의 Min/Max 설정 등)을 적용하며, transform()은 이렇게 설정된 정보를 이용해 데이터를 변환한다. 그리고 fit_transform()은 상기 두 메소드를 한번에 적용하는 기능을 수행한다.
+
+그런데 학습 데이터 세트와 테스트 데이터 세트에 fit()과 transform()을 적용할 때 주의가 필요하다. Scaler 객체를 이용해 학습 데이터 세트로 fit()과 transform()을 적용하면 테스트 데이터 세트로는 다시 fit()을 수행하지 않고, 학습 데이터 세트로 fit()을 수행한 결과를 이용해 transform() 변환을 적용해야 한다는 것이다.
+
+아래와 같은 예시를 보자
+
+
+```python
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
+
+# 학습 데이터는 0부터 10까지, 테스트 데이터는 0부터 5까지 값을 가지는 데이터 세트로 생성
+# Scaler 클래스의 fit(), transform()은 2차원 이상의 데이터만 가능하므로, reshape(-1,1)로
+# 차원 변경한다.
+
+train_array = np.arange(0,11).reshape(-1,1)
+test_array = np.arange(0,6).reshape(-1,1)
+
+# MinMaxScaler 객체에 별도의 feature_range 파라미터 값을 정하지 않으면 0~1 값으로 변환
+scaler = MinMaxScaler()
+# fit()하게 되면 train_array 데이터의 최솟값이 0, 최댓값이 10으로 설정.
+scaler.fit(train_array)
+# 1/10 scale로 train_array 데이터 변환한다. 원본 10 -> 1로 변환된다.
+train_scaled = scaler.transform(train_array)
+print(np.round(train_scaled.reshape(-1),2))
+```
+
+    [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+    
+
+
+```python
+#MinMaxScaler에 test_array를 fit()하게 되면 원본 데이터의 최솟값이 0, 최댓값이 5로 설정됨
+
+scaler.fit(test_array)
+
+# 1/5 scale로 test_array 데이터 변환함. 원본 5 -> 1로 변환.
+test_scaled = scaler.transform(test_array)
+# test_array의 scale 변환 출력
+print(np.round(test_scaled.reshape(-1),2))
+```
+
+    [0.  0.2 0.4 0.6 0.8 1. ]
+    
+
+ 위와 같이 fit을 train, test 데이터에 모두 적용하게 되면 다른 원본 값이 동일한 값으로 변환되는 결과를 초래하게 된다. ( train : 10 -> 1, test : 6 -> 1 )
+ 
+ 이러한 이유로 test 데이터에는 fit을 적용해서는 안되며 학습데이터로 이미 fit()이 적용된 Scaler 객체를 이용해 transform() 으로 변환해야 하는 것이다.
+ 
+ 아래의 예시는 test 데이터에 fit을 적용하지 않고 scaling한 결과이다.
+
+
+```python
+scaler = MinMaxScaler()
+scaler.fit(train_array)
+train_scaled = scaler.transform(train_array)
+# train set의 scaling 결과
+print(np.round(train_scaled.reshape(-1),2))
+```
+
+    [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+    
+
+
+```python
+test_scaled = scaler.transform(test_array)
+print(np.round(test_scaled.reshape(-1),2))
+```
+
+    [0.  0.1 0.2 0.3 0.4 0.5]
+    
+
+따라서 동일한 이유로 fit_transform() 메소드 또한 train 데이터에만 적용하고, test 데이터에는 적용하지 말아야 한다.
+
+
+```python
+
+```
